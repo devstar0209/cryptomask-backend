@@ -1,0 +1,80 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model Admin {
+  id       Int    @id @default(autoincrement())
+  username String @unique
+  password String
+}
+
+model AppSetting {
+  id                   Int    @id @default(autoincrement())
+  helpUrl              String
+  privacyPolicyUrl     String
+  termsAndConditionUrl String
+  aboutUs              String @default("")
+  fee                  Float  @default(0)
+  adminAddress         String @default("")
+}
+
+model User {
+  id                   Int       @id @default(autoincrement())
+  address              String    @unique
+  seedPhraseBackedUp   Boolean   @default(false)
+  isDeactivated        Boolean   @default(false)
+  isTransactionBlocked Boolean   @default(false)
+  subAddress           String[]  @default([])
+  messages             Message[]
+}
+
+model Media {
+  id        Int       @id @default(autoincrement())
+  url       String
+  fileName  String
+  mediaType String
+  Message   Message[]
+}
+
+model Message {
+  id             Int      @id @default(autoincrement())
+  for            User     @relation(fields: [forId], references: [id], onDelete: Cascade)
+  forId          Int
+  message        String
+  attachment     Media?   @relation(fields: [mediaId], references: [id])
+  seen           Boolean  @default(false)
+  isAdminMessage Boolean  @default(false)
+  timestamp      DateTime @default(now())
+  mediaId        Int?
+
+  @@index([forId])
+  @@index([mediaId])
+}
+
+model UserSignup {
+  id             Int      @id @default(autoincrement())
+  email          String   @unique
+  password       String
+  tronAddress    String?
+  tronPrivateKey String?
+  tronMnemonic   String?
+  bnbAddress     String?
+  bnbPrivateKey  String?
+  bnbMnemonic    String?
+
+  emailOtp        String?
+  emailOtpExpires DateTime?
+  emailOtpVerified Boolean @default(false)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}

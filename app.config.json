@@ -1,0 +1,10 @@
+{
+    "apps": [
+        {
+            "name": "backend-api",
+            "script": "nodemon",
+            "interpreter": "none",
+            "args": "index.ts --exp-backoff-restart-delay=100"
+        }
+    ]
+}
