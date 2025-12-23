@@ -1,31 +1,63 @@
-name: Prisma Migrate
+name: Prisma Migrate & Build
 
 on:
   push:
     branches:
       - main
+      - '**'   # All branches (preview deployments)
 
 jobs:
-  migrate:
+  migrate-and-build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
+      # 1️⃣ Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
+      # 2️⃣ Setup Node
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: npm ci
 
-      - name: Prisma generate
+      # 4️⃣ Prisma generate
+      - name: Generate Prisma Client
         run: npx prisma generate
 
-      - name: Run Prisma migrations
-        run: npx prisma migrate deploy
+      # 5️⃣ Set Prisma env vars
+      - name: Set Prisma DB URLs
+        run: |
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            echo "Using main DB"
+            echo "PRISMA_URL=$POSTGRES_PRISMA_URL" >> $GITHUB_ENV
+            echo "PRISMA_DIRECT_URL=$POSTGRES_URL_NON_POOLING" >> $GITHUB_ENV
+          else
+            echo "Using preview DB"
+            echo "PRISMA_URL=$PREVIEW_POSTGRES_PRISMA_URL" >> $GITHUB_ENV
+            echo "PRISMA_DIRECT_URL=$PREVIEW_POSTGRES_URL_NON_POOLING" >> $GITHUB_ENV
+          fi
+
+      # 6️⃣ Run Prisma migrations with lock retry
+      - name: Run Prisma Migrations
         env:
-          POSTGRES_PRISMA_URL: ${{ secrets.POSTGRES_PRISMA_URL }}
-          POSTGRES_URL_NON_POOLING: ${{ secrets.POSTGRES_URL_NON_POOLING }}
+          POSTGRES_PRISMA_URL: ${{ env.PRISMA_URL }}
+          POSTGRES_URL_NON_POOLING: ${{ env.PRISMA_DIRECT_URL }}
+        run: |
+          echo "Applying migrations..."
+          for i in {1..5}; do
+            npx prisma migrate deploy && break || echo "Lock held, retrying in 10s..." && sleep 10
+          done
+
+      # 7️⃣ Optional: Show migration status
+      - name: Check migration status
+        env:
+          POSTGRES_URL_NON_POOLING: ${{ env.PRISMA_DIRECT_URL }}
+        run: npx prisma migrate status
+
+      # 8️⃣ Build app
+      - name: Build app
+        run: npm run build
